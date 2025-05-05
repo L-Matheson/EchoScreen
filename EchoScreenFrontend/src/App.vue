@@ -6,7 +6,12 @@ const store = useMainEchoStore()
 </script>
 
 <template>
-  <div>
+  <div class="p-0 m-0" style="margin: 0px; padding: 0px;">
     <EchoSideBar></EchoSideBar>
   </div>
 </template>
+
+<style>
+
+
+</style>
