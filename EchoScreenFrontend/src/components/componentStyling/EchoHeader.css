@@ -1,10 +1,57 @@
-.header-background{
-    position: fixed;
-    min-height: 70px;
-    margin: 0;
-    padding: 0;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    background: white;
+.header-background {
+  position: fixed;
+  min-height: 70px;
+  margin: 0;
+  padding: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  background: white;
+  display: flex;
+  justify-content: space-between;
+  padding-right: 15px;
 }
+
+.action-buttons {
+
+  right: 0;
+  padding-right: 30px;
+  margin: 0;
+  position: absolute;
+  top: 50%;
+  -ms-transform: translateY(-50%);
+  transform: translateY(-50%);
+  display: flex;
+  justify-content: space-around;
+  gap: 18px;
+  height: 35px;
+}
+
+.user-profile-button{
+    display: flex;
+    justify-content: space-around;
+
+}
+.drawer-footer {
+  display: flex;
+  justify-content: space-around;
+}
+
+.user-profile-button{
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+ max-width: 150px;
+    gap: 5px;
+}
+
+.dropdown-menu {
+    position: absolute;
+    top: 100%; /* Position it below the button */
+    right: 0;
+    background-color: white;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    z-index: 1000;
+    transition: 1;
+  }

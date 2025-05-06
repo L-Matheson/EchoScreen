@@ -7,6 +7,11 @@ export const useMainEchoStore = defineStore('mainEchoStore', () => {
   function increment() {
     count.value++
   }
+function getUser(){
+  return {username: username, role: role}
+}
+  const username = ref('Test User')
+  const role = ref('Admin')
 
-  return { count, doubleCount, increment }
+  return { count, doubleCount, increment, username, role, getUser }
 })
