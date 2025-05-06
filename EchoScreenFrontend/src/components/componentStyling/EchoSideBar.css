@@ -1,8 +1,10 @@
 .side-bar-background{
-    background-color: blue;
-    padding: 0px;
-    min-width: 100px;
-    min-height: 100px;
-    max-width: 100px;
-    max-height: 100px;
+    position: fixed;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    left: 0;
+    width: 70px;
+    background: var(--menu-bg);
+    transition: 0.5s ;
 }
