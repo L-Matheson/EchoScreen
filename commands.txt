@@ -1,8 +1,11 @@
 
-   install all nesseccary packages
-   npm install 
+install all nesseccary packages
+npm install 
    
-   npm run format
+npm run format
    
 run the vue app
-   npm run dev  
+npm run dev  
+
+   // Fancy docker key, may not be needed
+   7161e3e2136cc1170ffcc0e022999da41ca5b7dbff2f57dfab93861b776fa636
