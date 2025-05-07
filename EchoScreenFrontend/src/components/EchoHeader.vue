@@ -23,6 +23,7 @@ onMounted(() => {
 async function loadData() {
   user.value = mainStore.getUser()
 }
+
 </script>
 
 <template>
@@ -49,6 +50,8 @@ async function loadData() {
       <div
         class="user-profile-button"
         style="cursor: pointer"
+        @focus="isDropdownVisible = true"
+        @blur="isDropdownVisible = false"
         @click="isDropdownVisible = !isDropdownVisible"
       >
         <Avatar label="V" style="background-color: #ece9fc; color: #2a1261" shape="circle" />
