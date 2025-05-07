@@ -1,4 +1,4 @@
-module example/hello
+module example/EchoScreenBackend
 
 go 1.24.2
 
