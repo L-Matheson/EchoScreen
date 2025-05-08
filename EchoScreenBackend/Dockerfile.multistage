@@ -1,0 +1,53 @@
+# This Dockerfile uses a multi-stage build to create a lightweight and secure container image for a Go application.
+# 
+# Stage 1: Build the application from source
+# - Base image: golang:1.24.2
+# - Sets the working directory to /app
+# - Copies go.mod and go.sum to the container and downloads dependencies
+# - Copies the source code from the main directory
+# - Builds the Go application with CGO disabled for a statically linked binary
+#
+# Stage 2: Run tests
+# - Reuses the build-stage image
+# - Executes `go test` to run unit tests for the application
+#
+# Stage 3: Create a lean release image
+# - Base image: gcr.io/distroless/base-debian11 (minimal and secure)
+# - Sets the working directory to the root directory
+# - Copies the built binary from the build-stage
+# - Exposes port 8080 for the application
+# - Runs the application as a non-root user for security
+# - Specifies the entry point for the application
+# syntax=docker/dockerfile:1
+
+# Build the application from source
+FROM golang:1.24.2 AS build-stage
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the source code. Note the slash at the end, as explained in
+# https://docs.docker.com/reference/dockerfile/#copy
+COPY main/*.go ./main/
+
+# Build
+RUN CGO_ENABLED=0 GOOS=linux go build -o /docker-gs-ping ./main/server.go
+
+# Run the tests in the container
+FROM build-stage AS run-test-stage
+RUN go test -v ./...
+
+# Deploy the application binary into a lean image
+FROM gcr.io/distroless/base-debian11 AS build-release-stage
+
+WORKDIR /
+
+COPY --from=build-stage /docker-gs-ping /docker-gs-ping
+
+EXPOSE 8080
+
+USER nonroot:nonroot
+
+ENTRYPOINT ["/docker-gs-ping"]

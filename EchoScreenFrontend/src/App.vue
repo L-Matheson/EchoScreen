@@ -20,7 +20,7 @@ const password = ref('');
 async function handleLogin() {
 
 
-  fetch('http://localhost:3000')
+  fetch('http://localhost/ping')
         .then(response => response.text())
         .then(data => {
         	console.log(data);

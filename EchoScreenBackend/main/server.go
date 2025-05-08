@@ -1,142 +1,161 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
+	"os"
 
-	// Postgres driver for Go, the underscore is used to import the package for its side effects (registering the driver)
-	// Side effects are changes that occur outside of a function's scope, such as modifying global variables or performing I/O operations.
-	// In this case, the side effect is registering the PostgreSQL driver with the database/sql package, allowing it to be used for database operations.
-	_ "github.com/lib/pq"
+	"github.com/cenkalti/backoff/v4"
+	"github.com/cockroachdb/cockroach-go/v2/crdb"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
-type User struct {
-	name     string
-	password string
-	email    string
-	role     string
-}
-
-// Go to go docs to find best functions needed
 func main() {
-	// WARNING: Do not use this in production code, password is hard coded in this url
-	connStr := "postgres://postgres:secret@localhost:5432/gopgtest?sslmode=disable"
 
-	// Open a connection to the database
-	// first argument is the driver name, second is the connection string
-	// open returns two values, a pointer to the database and an error
-	db, err := sql.Open("postgres", connStr)
+	// Initialize the Echo framework
+	// and set up middleware for logging and recovery
+	e := echo.New()
 
+	e.Use(middleware.Logger())
+	e.Use(middleware.Recover())
+
+	// Declares the store variable to hold the database connection, titled db.
+	// Saves to err if their is an error initializing the store.
+	// If there is an error, it logs the error and exits the program.
+	db, err := initStore()
 	if err != nil {
-		// handle error
-		log.Fatal(err)
+		log.Fatalf("failed to initialize the store: %s", err)
 	}
-
-	// close the database connection when the function returns
 	defer db.Close()
 
-	//db.ping is a method that checks if the database is reachable, its a health function
-	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+	/*
+	** Routes **
+	 */
+	e.GET("/", func(c echo.Context) error {
+		return rootHandler(db, c)
+	})
+
+	e.GET("/ping", func(c echo.Context) error {
+		return c.JSON(http.StatusOK, struct{ Status string }{Status: "OK"})
+	})
+
+	e.POST("/send", func(c echo.Context) error {
+		return sendHandler(db, c)
+	})
+
+	/*
+		Routes end
+	*/
+
+	// Set the HTTP port from the environment variable or default to 8080
+	// If the environment variable is not set, it defaults to 8080.
+	httpPort := os.Getenv("HTTP_PORT")
+	if httpPort == "" {
+		httpPort = "8080"
 	}
 
-	createUserTable(db)
-
-	// testUser := User{
-	// 	name:     "John Doe",
-	// 	password: "password",
-	// 	email:    "test21@gmail.com",
-	// 	role:     "admin",
-	// }
-	getAllUsers(db)
+	e.Logger.Fatal(e.Start(":" + httpPort))
 }
 
-// the param is a sql database pointer, this is the connection to the database
-func createUserTable(db *sql.DB) {
-	query := `CREATE TABLE IF NOT EXISTS users (
-		id SERIAL PRIMARY KEY,
-		name TEXT NOT NULL,
-		email TEXT NOT NULL UNIQUE,
-		password TEXT NOT NULL,
-		role TEXT NOT NULL DEFAULT 'client'
-)`
-
-	// Execute the query, this will create the table if it does not exist
-	// The Exec method is used to execute a query that doesn't return rows, such as an INSERT, UPDATE, or DELETE statement.
-	// It returns a Result and an error. The Result contains information about the execution of the query, such as the number of rows affected.
-	// Since we are creating a table, we don't need to check the result, we just need to check for errors.
-	// The underscore is used to ignore the result, since we don't need it in this case.
-	_, err := db.Exec(query)
-
-	if err != nil {
-		// handle error
-		log.Fatal(err)
-	}
+type Message struct {
+	Value string `json:"value"`
 }
 
-func insertUser(db *sql.DB, user User) int {
-	// The $1, $2, $3, $4 are placeholders for the values that will be passed to the query.
-	query := `INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id`
+// initStore initializes a connection to a PostgreSQL database and ensures
+// that a specific table exists. It uses environment variables to construct
+// the connection string and retries the connection using an exponential
+// backoff strategy in case of failure.
+//
+// Returns:
+//   - A pointer to the initialized sql.DB instance if successful.
+//   - An error if the connection or table creation fails.
+func initStore() (*sql.DB, error) {
 
-	var pk int
+	// sets up the connection string for the PostgreSQL database using environment variables.
+	pgConnString := fmt.Sprintf("host=%s port=%s dbname=%s user=%s password=%s sslmode=disable",
+		os.Getenv("PGHOST"),
+		os.Getenv("PGPORT"),
+		os.Getenv("PGDATABASE"),
+		os.Getenv("PGUSER"),
+		os.Getenv("PGPASSWORD"),
+	)
 
-	// The QueryRow method is used to execute a query that returns a single row.
-	// First argument is the query string, the rest are the values to be passed to the query, in order.
-	// The Scan method is used to copy the columns from the row into the variables passed as arguments.
-	// &pk is a pointer to the variable above where the value will be stored.
-	err := db.QueryRow(query, user.name, user.email, user.password, user.role).Scan(&pk)
+	var (
+		db  *sql.DB
+		err error
+	)
 
-	if err != nil {
-		// handle error
-		log.Fatal(err)
+	openDB := func() error {
+		db, err = sql.Open("postgres", pgConnString)
+		return err
 	}
-	return pk
+
+	err = backoff.Retry(openDB, backoff.NewExponentialBackOff())
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := db.Exec(
+		"CREATE TABLE IF NOT EXISTS message (value TEXT PRIMARY KEY)"); err != nil {
+		return nil, err
+	}
+
+	return db, nil
 }
 
-func getUser(db *sql.DB, id int) {
-
-	var name string
-	var email string
-	var password string
-	var role string
-
-	query := "SELECT name, email, password, role FROM users WHERE id = $1"
-	err := db.QueryRow(query, id).Scan(&name, &email, &password, &role)
-
+func rootHandler(db *sql.DB, c echo.Context) error {
+	r, err := countRecords(db)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			log.Fatalf("no rows were returned for id %d", id)
-		}
-		log.Fatal(err)
+		return c.HTML(http.StatusInternalServerError, err.Error())
 	}
-	fmt.Printf(" User: %s, %s, %s, %s\n", name, email, password, role)
+	return c.HTML(http.StatusOK, fmt.Sprintf("Hello, Docker! (%d)\n", r))
 }
 
-func getAllUsers(db *sql.DB) {
+func sendHandler(db *sql.DB, c echo.Context) error {
 
-	data := []User{}                                                       // sets up an empy slice of users
-	rows, err := db.Query("SELECT name, email, password, role FROM users") // query gets all users from the database
-	if err != nil {
-		log.Fatal(err)
+	m := &Message{}
+
+	if err := c.Bind(m); err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
 	}
-	// Close the row when the function returns
+
+	err := crdb.ExecuteTx(context.Background(), db, nil,
+		func(tx *sql.Tx) error {
+			_, err := tx.Exec(
+				"INSERT INTO message (value) VALUES ($1) ON CONFLICT (value) DO UPDATE SET value = excluded.value",
+				m.Value,
+			)
+			if err != nil {
+				return c.JSON(http.StatusInternalServerError, err)
+			}
+			return nil
+		})
+
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
+	}
+
+	return c.JSON(http.StatusOK, m)
+}
+
+func countRecords(db *sql.DB) (int, error) {
+	rows, err := db.Query("SELECT COUNT(*) FROM message")
+	if err != nil {
+		return 0, err
+	}
 	defer rows.Close()
 
-	var name string
-	var email string
-	var password string
-	var role string
-
-	// iterates over all the returned data
+	count := 0
 	for rows.Next() {
-		err := rows.Scan(&name, &email, &password, &role)
-		if err != nil {
-			log.Fatal(err)
+		if err := rows.Scan(&count); err != nil {
+			return 0, err
 		}
-		data = append(data, User{name, email, password, role})
-
+		rows.Close()
 	}
 
-	fmt.Println("Users:", data)
+	return count, nil
 }

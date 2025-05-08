@@ -9,3 +9,66 @@ npm run dev
 
    // Fancy docker key, may not be needed
    7161e3e2136cc1170ffcc0e022999da41ca5b7dbff2f57dfab93861b776fa636
+
+runs docker container
+ docker run docker-gs-ping
+
+ Runs docker container but names the container
+ docker run -d -p 8080:8080 --name rest-server docker-gs-ping
+
+ Views current docter images
+ docker image ls
+
+ Builds docker container
+ docker build -t docker-gs-ping:multistage -f Dockerfile.multistage .
+
+ calls the specified route
+ curl http://localhost:8080/
+
+ Lists all docker containers
+docker ps
+
+Stops the docker container
+docker stop **Insert container name here**
+
+restarts docker container 
+docker restart **Insert container name here**
+
+Creates a docker volume named roach (stores the data)
+ docker volume create roach
+
+View all docker volumes
+docker volume list
+
+Creates a docker bridge named mynet (user defined bridge network. allows apps to talk)
+docker network create -d bridge mynet
+
+View all docker bridges
+docker network list
+
+Runs the docker contianer, linking the volume, bridge, and container.
+Uses port 8080, uses cockroach db
+docker run -d `
+  --name roach `
+  --hostname db `
+  --network mynet `
+  -p 26257:26257 `
+  -p 8080:8080 `
+  -v roach:/cockroach/cockroach-data `
+  cockroachdb/cockroach:latest start-single-node `
+  --insecure
+
+Using cockroachdb, opens a SQL shell
+docker exec -it roach ./cockroach sql --insecure
+
+Creates a database titled mydb
+CREATE DATABASE mydb;
+
+Creates a user named totoro
+CREATE USER totoro;
+
+gives user all access
+GRANT ALL ON DATABASE mydb TO totoro
+
+builds the docker containre
+ docker build --tag docker-gs-ping-roach .
