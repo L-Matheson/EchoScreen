@@ -1,0 +1,40 @@
+.top-cards {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.single-card {
+    position: relative;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: rgba(0.1, 0.1, 0.1, 0.1) 2px 4px 12px;
+    padding: 20px;
+    flex: 1;
+    margin-right: 10px;
+    min-width: 85px;
+    width: 22.9vw;
+    min-height: 150px;
+}
+
+.card-title{
+    font-size: 18px;
+    font-weight: 700;
+    color: #1f2937;
+    float: right;
+    margin-top: -5px;
+}
+/* Get the card content in the bottom of the div */
+.card-content{
+    position: absolute;
+    bottom: 0px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #4b5563;
+}
+.single-card i {
+    font-size: 30px;
+    color: #000000;
+    float: left;
+}
