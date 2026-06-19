@@ -1,7 +1,59 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+
+interface FieldPair {
+  source: string
+  target: string
+}
+
+interface Props {
+  sourceFields?: string[]
+  targetOptions?: string[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  sourceFields: () => [],
+  targetOptions: () => []
+})
+
+const emit = defineEmits<{
+  close: []
+  save: [pairs: FieldPair[]]
+}>()
+
+const search = ref<string>('')
+
+const pairs = ref<FieldPair[]>(
+  props.sourceFields.map((src, i) => ({
+    source: src,
+    target: props.targetOptions[i] ?? ''
+  }))
+)
+
+const filteredPairs = computed<FieldPair[]>(() => {
+  if (!search.value.trim()) return pairs.value
+  const q = search.value.toLowerCase()
+  return pairs.value.filter(p => p.source.toLowerCase().includes(q))
+})
+
+function addPair(): void {
+  pairs.value.push({ source: '', target: '' })
+}
+
+function removePair(index: number): void {
+  const pair = filteredPairs.value[index]
+  const realIndex = pairs.value.indexOf(pair)
+  if (realIndex !== -1) pairs.value.splice(realIndex, 1)
+}
+
+function saveMapping(): void {
+  emit('save', pairs.value.map(p => ({ source: p.source, target: p.target })))
+}
+</script>
+
 <template>
   <div class="modal-backdrop" @click.self="$emit('close')">
     <div class="modal">
-      <!-- Header -->
       <div class="modal-header">
         <h2 class="modal-title">Map Fields</h2>
         <button class="close-btn" @click="$emit('close')" aria-label="Close">
@@ -11,7 +63,6 @@
         </button>
       </div>
 
-      <!-- Search -->
       <div class="search-wrapper">
         <svg class="search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
           <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
@@ -25,23 +76,19 @@
         />
       </div>
 
-      <!-- Column Labels -->
       <div class="column-labels">
         <span>SOURCE FIELD</span>
         <span>TARGET KEY</span>
       </div>
 
-      <!-- Field Pairs -->
       <div class="field-list">
         <div
           v-for="(pair, index) in filteredPairs"
           :key="index"
           class="field-row"
         >
-          <!-- Source Field (read-only) -->
           <div class="field-source">{{ pair.source }}</div>
 
-          <!-- Target Key (dropdown if targetOptions given, else text input) -->
           <select
             v-if="targetOptions && targetOptions.length"
             v-model="pair.target"
@@ -59,7 +106,6 @@
             placeholder="Enter target key..."
           />
 
-          <!-- Remove row -->
           <button class="remove-btn" @click="removePair(index)" aria-label="Remove field pair">
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
               <path d="M10 3L3 10M3 3l7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -68,7 +114,6 @@
         </div>
       </div>
 
-      <!-- Add Field Pair -->
       <button class="add-btn" @click="addPair">
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
           <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
@@ -76,7 +121,6 @@
         Add Field Pair
       </button>
 
-      <!-- Footer -->
       <div class="modal-footer">
         <button class="btn-cancel" @click="$emit('close')">Cancel</button>
         <button class="btn-save" @click="saveMapping">Save Mapping</button>
@@ -85,66 +129,7 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed } from 'vue'
-
-const props = defineProps({
-  /**
-   * Array of source field name strings.
-   * e.g. ['customer_id', 'transaction_date', 'order_value_usd', 'loyalty_tier']
-   */
-  sourceFields: {
-    type: Array,
-    default: () => []
-  },
-  /**
-   * Array of target key strings.
-   * If provided, target column renders as a <select> dropdown.
-   * If empty/omitted, target column renders as a free-text <input>.
-   * e.g. ['uid_pk', 'purchase_time', 'amount_gross']
-   */
-  targetOptions: {
-    type: Array,
-    default: () => []
-  }
-})
-
-const emit = defineEmits(['close', 'save'])
-
-const search = ref('')
-
-// Build initial pairs from sourceFields prop
-const pairs = ref(
-  props.sourceFields.map((src, i) => ({
-    source: src,
-    target: props.targetOptions[i] ?? ''
-  }))
-)
-
-const filteredPairs = computed(() => {
-  if (!search.value.trim()) return pairs.value
-  const q = search.value.toLowerCase()
-  return pairs.value.filter(p => p.source.toLowerCase().includes(q))
-})
-
-function addPair() {
-  pairs.value.push({ source: '', target: '' })
-}
-
-function removePair(index) {
-  // Find the actual index in the full pairs array (search may filter)
-  const pair = filteredPairs.value[index]
-  const realIndex = pairs.value.indexOf(pair)
-  if (realIndex !== -1) pairs.value.splice(realIndex, 1)
-}
-
-function saveMapping() {
-  emit('save', pairs.value.map(p => ({ source: p.source, target: p.target })))
-}
-</script>
-
 <style scoped>
-/* ── Backdrop ── */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -155,7 +140,6 @@ function saveMapping() {
   z-index: 1000;
 }
 
-/* ── Modal shell ── */
 .modal {
   background: #fff;
   border-radius: 10px;
@@ -168,7 +152,6 @@ function saveMapping() {
   overflow: hidden;
 }
 
-/* ── Header ── */
 .modal-header {
   display: flex;
   align-items: center;
@@ -198,7 +181,6 @@ function saveMapping() {
 }
 .close-btn:hover { color: #111; }
 
-/* ── Search ── */
 .search-wrapper {
   position: relative;
   padding: 14px 20px 10px;
@@ -228,7 +210,6 @@ function saveMapping() {
 .search-input:focus { border-color: #2563eb; background: #fff; }
 .search-input::placeholder { color: #bbb; }
 
-/* ── Column labels ── */
 .column-labels {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -240,7 +221,6 @@ function saveMapping() {
   text-transform: uppercase;
 }
 
-/* ── Field list ── */
 .field-list {
   flex: 1;
   overflow-y: auto;
@@ -260,7 +240,6 @@ function saveMapping() {
 }
 .field-row:last-child { border-bottom: none; }
 
-/* Source label */
 .field-source {
   font-size: 13.5px;
   color: #222;
@@ -270,7 +249,6 @@ function saveMapping() {
   text-overflow: ellipsis;
 }
 
-/* Target input / select */
 .field-target {
   width: 100%;
   box-sizing: border-box;
@@ -297,7 +275,6 @@ select.field-target.placeholder { color: #bbb; }
 .field-target:focus { border-color: #2563eb; }
 .field-target::placeholder { color: #bbb; }
 
-/* Remove button */
 .remove-btn {
   background: none;
   border: none;
@@ -313,7 +290,6 @@ select.field-target.placeholder { color: #bbb; }
 }
 .remove-btn:hover { color: #e55; }
 
-/* ── Add field pair ── */
 .add-btn {
   display: flex;
   align-items: center;
@@ -330,7 +306,6 @@ select.field-target.placeholder { color: #bbb; }
 }
 .add-btn:hover { opacity: 0.75; }
 
-/* ── Footer ── */
 .modal-footer {
   display: flex;
   justify-content: flex-end;
