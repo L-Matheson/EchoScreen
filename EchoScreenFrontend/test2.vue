@@ -52,292 +52,78 @@ function saveMapping(): void {
 </script>
 
 <template>
-  <div class="modal-backdrop" @click.self="$emit('close')">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">Map Fields</h2>
-        <button class="close-btn" @click="$emit('close')" aria-label="Close">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
+  <div class="flex flex-col gap-4 p-4">
+    <div class="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4">
+      <p class="text-base font-semibold text-gray-900 dark:text-white">Map Fields</p>
+      <UButton
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-x"
+        size="sm"
+        @click="$emit('close')"
+      />
+    </div>
 
-      <div class="search-wrapper">
-        <svg class="search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
-          <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <input
-          v-model="search"
-          type="text"
-          class="search-input"
-          placeholder="Search source fields..."
-        />
-      </div>
+    <UInput
+      v-model="search"
+      icon="i-lucide-search"
+      placeholder="Search source fields..."
+      size="sm"
+    />
 
-      <div class="column-labels">
-        <span>SOURCE FIELD</span>
-        <span>TARGET KEY</span>
-      </div>
+    <div class="grid grid-cols-2 px-1">
+      <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Source Field</span>
+      <span class="text-xs font-semibold uppercase tracking-wider text-gray-400">Target Key</span>
+    </div>
 
-      <div class="field-list">
-        <div
-          v-for="(pair, index) in filteredPairs"
-          :key="index"
-          class="field-row"
-        >
-          <div class="field-source">{{ pair.source }}</div>
+    <div class="flex flex-col divide-y divide-gray-100 dark:divide-gray-800">
+      <div
+        v-for="(pair, index) in filteredPairs"
+        :key="index"
+        class="grid grid-cols-2 items-center gap-3 py-2"
+      >
+        <span class="truncate text-sm text-gray-800 dark:text-gray-200">{{ pair.source }}</span>
 
-          <select
+        <div class="flex items-center gap-2">
+          <USelect
             v-if="targetOptions && targetOptions.length"
             v-model="pair.target"
-            class="field-target"
-            :class="{ placeholder: !pair.target }"
-          >
-            <option value="" disabled>Select target...</option>
-            <option v-for="opt in targetOptions" :key="opt" :value="opt">{{ opt }}</option>
-          </select>
-          <input
+            :options="[{ label: 'Select target...', value: '' }, ...targetOptions.map(o => ({ label: o, value: o }))]"
+            size="sm"
+            class="flex-1"
+          />
+          <UInput
             v-else
             v-model="pair.target"
-            type="text"
-            class="field-target"
             placeholder="Enter target key..."
+            size="sm"
+            class="flex-1"
           />
-
-          <button class="remove-btn" @click="removePair(index)" aria-label="Remove field pair">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <path d="M10 3L3 10M3 3l7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </button>
+          <UButton
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-x"
+            size="xs"
+            @click="removePair(index)"
+          />
         </div>
       </div>
+    </div>
 
-      <button class="add-btn" @click="addPair">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
-        </svg>
-        Add Field Pair
-      </button>
+    <UButton
+      variant="ghost"
+      color="primary"
+      icon="i-lucide-plus"
+      size="sm"
+      class="self-start"
+      @click="addPair"
+    >
+      Add Field Pair
+    </UButton>
 
-      <div class="modal-footer">
-        <button class="btn-cancel" @click="$emit('close')">Cancel</button>
-        <button class="btn-save" @click="saveMapping">Save Mapping</button>
-      </div>
+    <div class="flex justify-end gap-2 border-t border-gray-200 dark:border-gray-800 pt-4">
+      <UButton variant="ghost" color="neutral" @click="$emit('close')">Cancel</UButton>
+      <UButton color="primary" @click="saveMapping">Save Mapping</UButton>
     </div>
   </div>
 </template>
-
-<style scoped>
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal {
-  background: #fff;
-  border-radius: 10px;
-  width: 480px;
-  max-width: 95vw;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
-  overflow: hidden;
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 18px 20px 14px;
-  border-bottom: 1px solid #ebebeb;
-}
-
-.modal-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #111;
-  margin: 0;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #888;
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s;
-}
-.close-btn:hover { color: #111; }
-
-.search-wrapper {
-  position: relative;
-  padding: 14px 20px 10px;
-}
-
-.search-icon {
-  position: absolute;
-  left: 34px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #aaa;
-  pointer-events: none;
-}
-
-.search-input {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 8px 12px 8px 36px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 13.5px;
-  color: #333;
-  outline: none;
-  background: #fafafa;
-  transition: border-color 0.15s;
-}
-.search-input:focus { border-color: #2563eb; background: #fff; }
-.search-input::placeholder { color: #bbb; }
-
-.column-labels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  padding: 4px 20px 6px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: #999;
-  text-transform: uppercase;
-}
-
-.field-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.field-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr auto;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 0;
-  border-bottom: 1px solid #f2f2f2;
-}
-.field-row:last-child { border-bottom: none; }
-
-.field-source {
-  font-size: 13.5px;
-  color: #222;
-  font-weight: 450;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.field-target {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 7px 10px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  font-size: 13.5px;
-  color: #222;
-  background: #fff;
-  outline: none;
-  appearance: none;
-  -webkit-appearance: none;
-  transition: border-color 0.15s;
-  background-image: none;
-}
-select.field-target {
-  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  padding-right: 28px;
-  cursor: pointer;
-}
-select.field-target.placeholder { color: #bbb; }
-.field-target:focus { border-color: #2563eb; }
-.field-target::placeholder { color: #bbb; }
-
-.remove-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #ccc;
-  padding: 4px;
-  border-radius: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.15s;
-  flex-shrink: 0;
-}
-.remove-btn:hover { color: #e55; }
-
-.add-btn {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 14px 20px 4px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: #2563eb;
-  padding: 0;
-  transition: opacity 0.15s;
-}
-.add-btn:hover { opacity: 0.75; }
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 20px;
-  border-top: 1px solid #ebebeb;
-  margin-top: 10px;
-}
-
-.btn-cancel {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 13.5px;
-  font-weight: 500;
-  color: #555;
-  padding: 8px 16px;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.btn-cancel:hover { background: #f3f4f6; }
-
-.btn-save {
-  background: #2563eb;
-  color: #fff;
-  border: none;
-  cursor: pointer;
-  font-size: 13.5px;
-  font-weight: 600;
-  padding: 8px 20px;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.btn-save:hover { background: #1d4ed8; }
-</style>
