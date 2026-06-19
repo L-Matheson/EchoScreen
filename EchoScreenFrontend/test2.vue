@@ -1,290 +1,368 @@
 <template>
-  <!-- PrimeVue Drawer — slides in from the right -->
-  <Drawer
-    :visible="visible"
-    position="right"
-    style="width: 420px;"
-    :header="drawerTitle"
-    @update:visible="emit('update:visible', $event)"
-  >
-    <!-- ── Step 1: Pick a component type ── -->
-    <div v-if="step === 'pick-type'" style="display: flex; flex-direction: column; gap: 12px; padding: 0.25rem 0;">
-      <p style="font-size: 0.8125rem; color: #888680; margin: 0 0 0.5rem;">
-        Choose the type of component for this entry.
-      </p>
-
-      <div
-        v-for="(typeKey) in availableTypes"
-        :key="typeKey"
-        style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; background: #fff; border: 1px solid #e5e3dc; border-radius: 12px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;"
-        :style="hoveredType === typeKey ? { borderColor: '#9f85e8', boxShadow: '0 0 0 3px rgba(139,115,224,0.1)' } : {}"
-        @click="onTypePicked(typeKey)"
-        @mouseenter="hoveredType = typeKey"
-        @mouseleave="hoveredType = null"
-      >
-        <span
-          style="display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 8px; background: #f3f0fd; flex-shrink: 0;"
-        >
-          <i :class="nodeTypeIcons[typeKey]" style="color: #6b52d9; font-size: 0.9375rem;" />
-        </span>
-        <div>
-          <p style="font-size: 0.9375rem; font-weight: 600; color: #1a1917; margin: 0 0 2px;">
-            {{ nodeTypeLabels[typeKey] }}
-          </p>
-          <p style="font-size: 0.75rem; color: #b0ada5; margin: 0;">
-            {{ nodeTypeDescriptions[typeKey] }}
-          </p>
-        </div>
-        <i class="pi pi-chevron-right" style="margin-left: auto; color: #c2bfb8; font-size: 0.75rem;" />
+  <div class="modal-backdrop" @click.self="$emit('close')">
+    <div class="modal">
+      <!-- Header -->
+      <div class="modal-header">
+        <h2 class="modal-title">Map Fields</h2>
+        <button class="close-btn" @click="$emit('close')" aria-label="Close">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M12 4L4 12M4 4l8 8" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+          </svg>
+        </button>
       </div>
-    </div>
 
-    <!-- ── Step 2: Configure the node via NodePropertyEditor ── -->
-    <div v-else-if="step === 'configure' && draftNode" style="display: flex; flex-direction: column; height: 100%;">
-      <!-- Back button -->
-      <button
-        style="display: inline-flex; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; color: #888680; font-size: 0.8125rem; font-weight: 500; padding: 0 0 1.25rem; font-family: inherit;"
-        @click="step = 'pick-type'"
-      >
-        <i class="pi pi-arrow-left" style="font-size: 0.75rem;" />
-        Back
+      <!-- Search -->
+      <div class="search-wrapper">
+        <svg class="search-icon" width="15" height="15" viewBox="0 0 15 15" fill="none">
+          <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <input
+          v-model="search"
+          type="text"
+          class="search-input"
+          placeholder="Search source fields..."
+        />
+      </div>
+
+      <!-- Column Labels -->
+      <div class="column-labels">
+        <span>SOURCE FIELD</span>
+        <span>TARGET KEY</span>
+      </div>
+
+      <!-- Field Pairs -->
+      <div class="field-list">
+        <div
+          v-for="(pair, index) in filteredPairs"
+          :key="index"
+          class="field-row"
+        >
+          <!-- Source Field (read-only) -->
+          <div class="field-source">{{ pair.source }}</div>
+
+          <!-- Target Key (dropdown if targetOptions given, else text input) -->
+          <select
+            v-if="targetOptions && targetOptions.length"
+            v-model="pair.target"
+            class="field-target"
+            :class="{ placeholder: !pair.target }"
+          >
+            <option value="" disabled>Select target...</option>
+            <option v-for="opt in targetOptions" :key="opt" :value="opt">{{ opt }}</option>
+          </select>
+          <input
+            v-else
+            v-model="pair.target"
+            type="text"
+            class="field-target"
+            placeholder="Enter target key..."
+          />
+
+          <!-- Remove row -->
+          <button class="remove-btn" @click="removePair(index)" aria-label="Remove field pair">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <path d="M10 3L3 10M3 3l7 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Add Field Pair -->
+      <button class="add-btn" @click="addPair">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/>
+        </svg>
+        Add Field Pair
       </button>
 
-      <!-- NodePropertyEditor handles all config fields for the chosen type -->
-      <NodePropertyEditor v-model:node="draftNode" style="flex: 1;" />
-
-      <Divider style="margin: 1.25rem 0 1rem;" />
-
-      <!-- Footer actions -->
-      <div style="display: flex; gap: 8px; justify-content: flex-end;">
-        <Button
-          label="Cancel"
-          text
-          severity="secondary"
-          style="font-size: 0.8125rem;"
-          @click="onCancel"
-        />
-        <Button
-          label="Save entry"
-          icon="pi pi-check"
-          style="font-size: 0.8125rem; background: #5b3ec8; border-color: #5b3ec8;"
-          @click="onSave"
-        />
+      <!-- Footer -->
+      <div class="modal-footer">
+        <button class="btn-cancel" @click="$emit('close')">Cancel</button>
+        <button class="btn-save" @click="saveMapping">Save Mapping</button>
       </div>
     </div>
-  </Drawer>
-</template>
-
-<script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import Drawer from 'primevue/drawer'
-import Button from 'primevue/button'
-import Divider from 'primevue/divider'
-import NodePropertyEditor from './NodePropertyEditor.vue'
-import {
-  type AnyNode,
-  nodeDefaults,
-  nodeTypeLabels,
-  nodeTypeIcons,
-} from './nodeDefaults'
-
-const nodeTypeDescriptions: Record<string, string> = {
-  inputtext:   'A single line of free text',
-  inputnumber: 'A numeric value with optional min/max',
-  dropdown:    'A selection from a predefined list',
-  repeater:    'A nested list of any component',
-}
-
-const availableTypes = Object.keys(nodeDefaults)
-
-// ── Props & emits ────────────────────────────────────────────────────────────
-
-interface Props {
-  visible: boolean
-  // Pass an existing node to edit, or leave undefined to create a new one
-  editingNode?: AnyNode | null
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  editingNode: null,
-})
-
-const emit = defineEmits<{
-  'update:visible': [value: boolean]
-  save: [node: AnyNode]
-}>()
-
-// ── Internal state ───────────────────────────────────────────────────────────
-
-type DrawerStep = 'pick-type' | 'configure'
-
-const step = ref<DrawerStep>('pick-type')
-const draftNode = ref<AnyNode | null>(null)
-const hoveredType = ref<string | null>(null)
-
-const drawerTitle = computed(() =>
-  step.value === 'pick-type' ? 'Choose component' : `Configure ${draftNode.value ? nodeTypeLabels[draftNode.value.type] : ''}`
-)
-
-// If an existing node is passed in (edit mode), jump straight to configure
-watch(() => props.visible, (open) => {
-  if (open && props.editingNode) {
-    // Deep clone so edits don't mutate the original until Save
-    draftNode.value = JSON.parse(JSON.stringify(props.editingNode))
-    step.value = 'configure'
-  } else if (open) {
-    step.value = 'pick-type'
-    draftNode.value = null
-  }
-})
-
-// ── Handlers ─────────────────────────────────────────────────────────────────
-
-function onTypePicked(typeKey: string) {
-  draftNode.value = nodeDefaults[typeKey]()
-  step.value = 'configure'
-}
-
-function onSave() {
-  if (!draftNode.value) return
-  emit('save', JSON.parse(JSON.stringify(draftNode.value)))
-  emit('update:visible', false)
-}
-
-function onCancel() {
-  emit('update:visible', false)
-}
-</script>
-
-
-
-
-
-<template>
-  <div style="font-family: 'DM Sans', system-ui, sans-serif; max-width: 600px;">
-
-    <!-- Repeater label -->
-    <p style="font-size: 0.8125rem; font-weight: 600; color: #1a1917; margin: 0 0 0.75rem; letter-spacing: -0.01em;">
-      {{ node.label || 'Repeater' }}
-    </p>
-
-    <!-- Entry list -->
-    <TransitionGroup tag="div" name="entry" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
-      <div
-        v-for="(entry, index) in node.entries"
-        :key="entryKeys[index]"
-        style="display: flex; align-items: flex-start; gap: 10px; padding: 14px 14px 14px 16px; background: #fff; border: 1px solid #e5e3dc; border-radius: 12px;"
-      >
-        <!-- Type badge -->
-        <span
-          style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 7px; background: #f3f0fd; flex-shrink: 0; margin-top: 1px;"
-        >
-          <i :class="nodeTypeIcons[entry.type]" style="color: #6b52d9; font-size: 0.8125rem;" />
-        </span>
-
-        <!-- Rendered node -->
-        <div style="flex: 1; min-width: 0;">
-          <p style="font-size: 0.6875rem; font-weight: 600; color: #b0ada5; margin: 0 0 6px; text-transform: uppercase; letter-spacing: 0.05em;">
-            {{ nodeTypeLabels[entry.type] }}
-          </p>
-          <NodeRenderer :node="entry" />
-        </div>
-
-        <!-- Edit & remove -->
-        <div style="display: flex; gap: 4px; flex-shrink: 0;">
-          <Button
-            icon="pi pi-pencil"
-            text
-            rounded
-            severity="secondary"
-            size="small"
-            :aria-label="`Edit entry ${index + 1}`"
-            style="width: 28px; height: 28px; padding: 0; color: #b0ada5;"
-            @click="openEditDrawer(index)"
-          />
-          <Button
-            icon="pi pi-times"
-            text
-            rounded
-            severity="secondary"
-            size="small"
-            :aria-label="`Remove entry ${index + 1}`"
-            style="width: 28px; height: 28px; padding: 0; color: #b0ada5;"
-            @click="removeEntry(index)"
-          />
-        </div>
-      </div>
-    </TransitionGroup>
-
-    <!-- Add entry -->
-    <Button
-      label="Add entry"
-      icon="pi pi-plus"
-      text
-      style="width: 100%; justify-content: center; border: 1px dashed #d4d0c8; border-radius: 10px; color: #888680; font-size: 0.8125rem; font-weight: 500; padding: 9px; margin-top: 2px;"
-      @click="openAddDrawer"
-    />
-
-    <!-- Drawer — handles both add and edit -->
-    <RepeaterEntryDrawer
-      v-model:visible="drawerVisible"
-      :editing-node="editingNode"
-      @save="onSave"
-    />
   </div>
 </template>
 
-<script setup lang="ts">
+<script setup>
 import { ref, computed } from 'vue'
-import Button from 'primevue/button'
-import NodeRenderer from './NodeRenderer.vue'
-import RepeaterEntryDrawer from './RepeaterEntryDrawer.vue'
-import { type AnyNode, type RepeaterNode, nodeTypeLabels, nodeTypeIcons } from './nodeDefaults'
 
-// ── Props & model ─────────────────────────────────────────────────────────────
-
-const node = defineModel<RepeaterNode>({ required: true })
-
-// ── Stable keys for TransitionGroup ──────────────────────────────────────────
-// We generate a key per entry once on creation so TransitionGroup can track
-// them correctly even when entries are spliced out and re-added.
-
-let keyCounter = 0
-const entryKeys = ref<number[]>(node.value.entries.map(() => keyCounter++))
-
-// ── Drawer state ──────────────────────────────────────────────────────────────
-
-const drawerVisible = ref(false)
-const editingNode = ref<AnyNode | null>(null)
-const editingIndex = ref<number | null>(null)
-
-function openAddDrawer() {
-  editingNode.value = null   // null = new entry, drawer starts at pick-type step
-  editingIndex.value = null
-  drawerVisible.value = true
-}
-
-function openEditDrawer(index: number) {
-  editingNode.value = node.value.entries[index]  // existing node → drawer jumps to configure
-  editingIndex.value = index
-  drawerVisible.value = true
-}
-
-function removeEntry(index: number) {
-  node.value.entries.splice(index, 1)
-  entryKeys.value.splice(index, 1)
-}
-
-// Called by the drawer when the user hits Save
-function onSave(saved: AnyNode) {
-  if (editingIndex.value !== null) {
-    // Edit — replace in place
-    node.value.entries.splice(editingIndex.value, 1, saved)
-  } else {
-    // Add — append with a fresh stable key
-    node.value.entries.push(saved)
-    entryKeys.value.push(keyCounter++)
+const props = defineProps({
+  /**
+   * Array of source field name strings.
+   * e.g. ['customer_id', 'transaction_date', 'order_value_usd', 'loyalty_tier']
+   */
+  sourceFields: {
+    type: Array,
+    default: () => []
+  },
+  /**
+   * Array of target key strings.
+   * If provided, target column renders as a <select> dropdown.
+   * If empty/omitted, target column renders as a free-text <input>.
+   * e.g. ['uid_pk', 'purchase_time', 'amount_gross']
+   */
+  targetOptions: {
+    type: Array,
+    default: () => []
   }
-  editingIndex.value = null
+})
+
+const emit = defineEmits(['close', 'save'])
+
+const search = ref('')
+
+// Build initial pairs from sourceFields prop
+const pairs = ref(
+  props.sourceFields.map((src, i) => ({
+    source: src,
+    target: props.targetOptions[i] ?? ''
+  }))
+)
+
+const filteredPairs = computed(() => {
+  if (!search.value.trim()) return pairs.value
+  const q = search.value.toLowerCase()
+  return pairs.value.filter(p => p.source.toLowerCase().includes(q))
+})
+
+function addPair() {
+  pairs.value.push({ source: '', target: '' })
+}
+
+function removePair(index) {
+  // Find the actual index in the full pairs array (search may filter)
+  const pair = filteredPairs.value[index]
+  const realIndex = pairs.value.indexOf(pair)
+  if (realIndex !== -1) pairs.value.splice(realIndex, 1)
+}
+
+function saveMapping() {
+  emit('save', pairs.value.map(p => ({ source: p.source, target: p.target })))
 }
 </script>
+
+<style scoped>
+/* ── Backdrop ── */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+/* ── Modal shell ── */
+.modal {
+  background: #fff;
+  border-radius: 10px;
+  width: 480px;
+  max-width: 95vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+  overflow: hidden;
+}
+
+/* ── Header ── */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid #ebebeb;
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #111;
+  margin: 0;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #888;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+.close-btn:hover { color: #111; }
+
+/* ── Search ── */
+.search-wrapper {
+  position: relative;
+  padding: 14px 20px 10px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #aaa;
+  pointer-events: none;
+}
+
+.search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: #333;
+  outline: none;
+  background: #fafafa;
+  transition: border-color 0.15s;
+}
+.search-input:focus { border-color: #2563eb; background: #fff; }
+.search-input::placeholder { color: #bbb; }
+
+/* ── Column labels ── */
+.column-labels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px 20px 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: #999;
+  text-transform: uppercase;
+}
+
+/* ── Field list ── */
+.field-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f2f2f2;
+}
+.field-row:last-child { border-bottom: none; }
+
+/* Source label */
+.field-source {
+  font-size: 13.5px;
+  color: #222;
+  font-weight: 450;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Target input / select */
+.field-target {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 13.5px;
+  color: #222;
+  background: #fff;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  transition: border-color 0.15s;
+  background-image: none;
+}
+select.field-target {
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+  cursor: pointer;
+}
+select.field-target.placeholder { color: #bbb; }
+.field-target:focus { border-color: #2563eb; }
+.field-target::placeholder { color: #bbb; }
+
+/* Remove button */
+.remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #ccc;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.remove-btn:hover { color: #e55; }
+
+/* ── Add field pair ── */
+.add-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 14px 20px 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #2563eb;
+  padding: 0;
+  transition: opacity 0.15s;
+}
+.add-btn:hover { opacity: 0.75; }
+
+/* ── Footer ── */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid #ebebeb;
+  margin-top: 10px;
+}
+
+.btn-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: #555;
+  padding: 8px 16px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.btn-cancel:hover { background: #f3f4f6; }
+
+.btn-save {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  padding: 8px 20px;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.btn-save:hover { background: #1d4ed8; }
+</style>
